@@ -1,0 +1,158 @@
+app_name: Scrum Master Assistant
+environment: dev
+
+jira_project_key: SCRM
+jira_base_url: https://<your-domain>.atlassian.net
+jira_auth_mode: service_token
+jira_publish_enabled: true
+jira_epic_field_id: customfield_10014
+# epic_link_field: "parent" for team-managed projects, "customfield_10014" for classic projects
+jira_epic_link_field: parent
+# auto_create_epics: true = Option A (auto-create epics via API)
+#                   false = Option B (use keys from jira_epic_map directly)
+jira_auto_create_epics: true
+jira_publish_on_scan: false
+jira_username: <your-jira-email>
+jira_api_token: <your-jira-api-token>
+jira_service_account_email: <your-jira-email>
+jira_secret_id: null
+jira_epic_map:
+  security: SEC-100
+  pii: SEC-100
+  secret: SEC-100
+  certificate: SEC-110
+  unauthorized_access: SEC-120
+  api_gateway: API-110
+  application_error: APP-100
+  resource_exhaustion: OPS-120
+  database: DB-100
+  service_reachability: OPS-130
+  network_issue: NET-100
+  infrastructure: OPS-100
+  latency: API-100
+  system_failure: OPS-110
+  api: API-100
+  compliance: GRC-100
+  spark_error: DATA-100
+
+default_flag_context_key: scrum-master-assistant
+launchdarkly_sdk_key: null
+enable_mock_data: false
+
+persistence_backend: postgres
+persistence_path: data/runtime
+postgres_dsn: postgresql://<user>:<password>@localhost:5432/scrum_master_assistant
+postgres_schema: scrum_master_assistant
+
+continuous_mode_enabled: true
+queue_backend: kafka
+queue_path: data/runtime/queue.jsonl
+kafka_bootstrap_servers:
+  - localhost:9092
+kafka_scan_topic: scrum-master-assistant.scan-jobs
+kafka_consumer_group: scrum-master-assistant-workers
+kafka_security_protocol: PLAINTEXT
+kafka_sasl_mechanism: null
+kafka_username: null
+kafka_password: null
+worker_poll_interval_seconds: 30
+worker_batch_size: 10
+reconciliation_schedule_enabled: true
+cert_sweep_schedule_hours: 12
+
+temporal_enabled: true
+temporal_task_queue: scrum-master-assistant
+temporal_namespace: default
+temporal_target_host: localhost:7233
+
+secrets_backend: env
+aws_secrets_region: null
+
+auth_mode: trusted_headers
+auth_required: true
+auth_oidc_issuer: null
+auth_oidc_audience: null
+auth_jwt_secret: null
+auth_trusted_email_header: x-auth-request-email
+auth_trusted_name_header: x-auth-request-name
+auth_trusted_subject_header: x-auth-request-user
+auth_trusted_roles_header: x-auth-request-roles
+auth_trusted_groups_header: x-auth-request-groups
+auth_role_map:
+  jira-users: jira-publisher
+  security-team: security-analyst
+  platform-admins: platform-admin
+  observability-viewers: viewer
+
+aws_auth_mode: iam_role
+aws_role_arn: null
+aws_access_key_id: null
+aws_secret_access_key: null
+aws_session_token: null
+aws_secret_id: null
+cloudwatch_log_groups: []
+cloudwatch_hours_lookback: 4
+cloudtrail_hours_lookback: 24
+
+datadog_api_key: <your-datadog-api-key>
+datadog_app_key: <your-datadog-app-key>
+datadog_site: datadoghq.com
+datadog_log_query: "*"
+datadog_hours_lookback: 4
+# Set datadog_start_date to fetch all retained logs (overrides hours_lookback)
+# e.g. "2024-01-01" fetches everything from that date to now (or datadog_end_date)
+datadog_start_date: null
+datadog_end_date: null
+# datadog_page_limit: logs per page (max 1000)
+datadog_page_limit: 1000
+# datadog_max_pages: -1 fetches all pages (all available logs within retention window)
+datadog_max_pages: 1
+datadog_secret_id: null
+
+azure_auth_mode: managed_identity
+azure_tenant_id: null
+azure_client_id: null
+azure_client_secret: null
+azure_secret_id: null
+azure_log_analytics_workspace_ids: []
+azure_monitor_query: >-
+  let horizon = ago(4h);
+  let gateway = AzureDiagnostics
+  | where TimeGenerated >= horizon
+  | where toint(httpStatus_d) in (401,403,429,500,502,503,504)
+  | project TimeGenerated, Message=tostring(msg_s), _ResourceId;
+  let exceptions = AppExceptions
+  | where TimeGenerated >= horizon
+  | project TimeGenerated, Message=coalesce(OuterMessage, InnermostMessage, ProblemId), _ResourceId;
+  let traces = AppTraces
+  | where TimeGenerated >= horizon
+  | where Message has_any ('timeout', 'connection refused', 'dns', 'database', 'oom', 'segmentation fault')
+  | project TimeGenerated, Message, _ResourceId;
+  gateway | union exceptions | union traces | take 200
+azure_monitor_hours_lookback: 4
+
+gcp_auth_mode: service_account
+gcp_service_account_json: null
+gcp_secret_id: null
+gcp_project_ids: []
+gcp_logging_filter: >-
+  (textPayload:("403" OR "401" OR "429" OR "500" OR "502" OR "503" OR "504")
+  OR jsonPayload.message:("403" OR "401" OR "429" OR "500" OR "502" OR "503" OR "504")
+  OR textPayload:("exception" OR "traceback" OR "segmentation fault" OR "OOMKilled" OR "OutOfMemoryError")
+  OR jsonPayload.message:("exception" OR "traceback" OR "segmentation fault" OR "OOMKilled" OR "OutOfMemoryError")
+  OR textPayload:("database" OR "connection refused" OR "pool exhausted" OR "dns resolution failed" OR "service not reachable")
+  OR jsonPayload.message:("database" OR "connection refused" OR "pool exhausted" OR "dns resolution failed" OR "service not reachable"))
+gcp_logging_hours_lookback: 4
+
+neural_enrichment_enabled: false
+claude_api_key: null
+claude_model: claude-sonnet-4-6
+# llm_provider: "anthropic" (default, cloud or Anthropic-compatible)
+#               "openai"    (Ollama, LM Studio, vLLM, llama.cpp, any OpenAI-compatible endpoint)
+llm_provider: anthropic
+# llm_base_url: null = use provider default
+#   Ollama:    http://localhost:11434/v1
+#   LM Studio: http://localhost:1234/v1
+#   vLLM:      http://localhost:8000/v1
+llm_base_url: null
+neural_enrichment_concurrency: 5
